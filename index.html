@@ -3,10 +3,16 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Lottie Pose Studio & SVG / Image Exporter</title>
+  <title>Lottie Pose Studio & 3D Print Exporter</title>
   <link rel="stylesheet" href="styles.css">
   <!-- lottie-web SVG renderer (local for 100% offline support) -->
   <script src="lottie.min.js"></script>
+  <!-- Three.js & 3D Print Addons (local for 100% offline support) -->
+  <script src="three.min.js"></script>
+  <script src="OrbitControls.js"></script>
+  <script src="SVGLoader.js"></script>
+  <script src="STLExporter.js"></script>
+  <script src="BufferGeometryUtils.js"></script>
 </head>
 <body>
 
@@ -15,8 +21,8 @@
     <div class="logo-area">
       <div class="logo-icon">L</div>
       <div class="logo-text">
-        <h1>Lottie Pose Studio</h1>
-        <p>Convert Animations to Static SVG &amp; Images</p>
+        <h1>Lottie Pose &amp; 3D Print Studio</h1>
+        <p>Convert Animations to Vector SVG &amp; Watertight .STL</p>
       </div>
     </div>
 
@@ -44,9 +50,13 @@
       <!-- Stage Toolbar -->
       <div class="stage-toolbar">
         <div class="stage-toolbar-group">
-          <span style="font-size: 12px; color: var(--text-muted); font-weight: 600;">BG:</span>
-          <select id="bg-select" class="form-select" style="width: 140px; padding: 4px 8px; font-size: 12px;">
-            <option value="checker">Checkerboard (Transparent)</option>
+          <!-- View Switcher (2D vs 3D) -->
+          <button id="btn-view-2d" class="btn btn-primary" style="padding: 4px 10px; font-size: 12px;">🎨 2D Stage</button>
+          <button id="btn-view-3d" class="btn btn-secondary" style="padding: 4px 10px; font-size: 12px;">🖨️ 3D Viewport</button>
+
+          <span style="font-size: 12px; color: var(--text-muted); font-weight: 600; margin-left: 8px;">BG:</span>
+          <select id="bg-select" class="form-select" style="width: 130px; padding: 4px 8px; font-size: 12px;">
+            <option value="checker">Checkerboard</option>
             <option value="white">Pure White</option>
             <option value="dark">Dark Slate</option>
           </select>
@@ -60,10 +70,23 @@
         </div>
       </div>
 
-      <!-- Viewport / Stage -->
+      <!-- 2D Viewport / Stage -->
       <div id="stage-viewport" class="stage-viewport bg-checker">
         <div id="canvas-wrapper" class="canvas-wrapper">
           <div id="lottie-player"></div>
+        </div>
+      </div>
+
+      <!-- 3D Print Viewport (Three.js with OrbitControls & Studio Lighting) -->
+      <div id="stage-viewport-3d" class="stage-viewport-3d">
+        <div id="three-viewport"></div>
+        <div class="viewport-3d-overlay">
+          <button id="btn-3d-reset-cam" class="btn btn-secondary" style="padding: 4px 10px; font-size: 11px;">🔄 Reset Cam</button>
+          <button id="btn-3d-focus" class="btn btn-secondary" style="padding: 4px 10px; font-size: 11px;">🎯 Focus Model</button>
+        </div>
+        <div class="build-plate-badge">
+          <span class="dot-grid"></span>
+          <span>3D Printer Bed (200×200 mm) • Studio PCF Soft Shadows</span>
         </div>
       </div>
 
@@ -106,10 +129,11 @@
         <button class="tab-btn active" data-tab="export">📤 Export</button>
         <button class="tab-btn" data-tab="pose">🕺 Poses</button>
         <button class="tab-btn" data-tab="colors">🎨 Colors</button>
+        <button class="tab-btn" data-tab="3dprint">🖨️ 3D Print</button>
         <button class="tab-btn" data-tab="json">⚙️ JSON</button>
       </nav>
 
-      <!-- TAB 1: EXPORT -->
+      <!-- TAB 1: EXPORT (2D) -->
       <div id="tab-export" class="tab-content active">
         
         <div class="section-title">Vector SVG Output</div>
@@ -165,7 +189,7 @@
         <div class="control-card" style="background: rgba(99, 102, 241, 0.08); border-color: rgba(99, 102, 241, 0.3);">
           <div style="font-size: 12px; font-weight: 600; color: #a5b4fc; margin-bottom: 4px;">💡 Pro Tip:</div>
           <div style="font-size: 11px; color: var(--text-muted); line-height: 1.4;">
-            Pause on any frame, adjust hand/shoe angles in the <strong>Poses</strong> tab, or change colors in the <strong>Colors</strong> tab before exporting!
+            Want a real physical figurine on your desk? Switch to the <strong>🖨️ 3D Print</strong> tab to inspect reliefs in clay mode and download an .STL file!
           </div>
         </div>
       </div>
@@ -374,7 +398,145 @@
         </div>
       </div>
 
-      <!-- TAB 4: JSON EXPORT -->
+      <!-- TAB 4: 3D PRINT STUDIO -->
+      <div id="tab-3dprint" class="tab-content">
+        
+        <!-- Architecture Switcher -->
+        <div class="section-title">Model Architecture</div>
+        <div class="segmented-control" id="seg-model-type">
+          <button class="seg-btn" data-type="coin">🪙 Coin Medallion</button>
+          <button class="seg-btn" data-type="25d_flatback">📐 2.5D Flat-Back</button>
+          <button class="seg-btn active" data-type="360_figurine">🧍 360° Figurine</button>
+        </div>
+
+        <!-- Dynamic Architecture Settings -->
+        <div id="arch-settings-coin" class="control-card arch-card" style="display: none; margin-bottom: 12px;">
+          <div style="font-size: 11px; font-weight: 700; color: #a5b4fc; margin-bottom: 8px;">🪙 Coin / Medallion Setup</div>
+          <div class="toggle-row">
+            <span class="toggle-label">Raised Border Rim</span>
+            <label class="switch">
+              <input type="checkbox" id="toggle-coin-rim" checked>
+              <span class="slider-switch"></span>
+            </label>
+          </div>
+          <div class="toggle-row" style="margin-top: 8px;">
+            <div>
+              <span class="toggle-label">Keychain Hole Loop</span>
+              <div style="font-size: 10px; color: var(--text-muted);">Top loop for keyring / lanyard</div>
+            </div>
+            <label class="switch">
+              <input type="checkbox" id="toggle-coin-keychain" checked>
+              <span class="slider-switch"></span>
+            </label>
+          </div>
+          <div class="form-group" style="margin-top: 10px;">
+            <div class="form-label">
+              <span>Disc Border Padding</span>
+              <span class="val" id="val-coin-padding">8 mm</span>
+            </div>
+            <input type="range" id="slider-coin-padding" class="range-slider" min="3" max="25" value="8">
+          </div>
+        </div>
+
+        <div id="arch-settings-figurine" class="control-card arch-card" style="margin-bottom: 12px;">
+          <div class="toggle-row" id="row-pedestal">
+            <div>
+              <div class="toggle-label">Pedestal Base (Stand)</div>
+              <div style="font-size: 10px; color: var(--text-muted);">Fused 2mm into shoes for standing on desk</div>
+            </div>
+            <label class="switch">
+              <input type="checkbox" id="toggle-3d-pedestal" checked>
+              <span class="slider-switch"></span>
+            </label>
+          </div>
+        </div>
+
+        <!-- Material Switcher -->
+        <div class="section-title">Preview Material (Print Verification)</div>
+        <div class="segmented-control" id="seg-material-mode">
+          <button class="seg-btn active" data-mat="clay">⚪ Monochrome Clay</button>
+          <button class="seg-btn" data-mat="colored">🎨 Colored Preview</button>
+        </div>
+
+        <!-- Detail Verification Toggles -->
+        <div class="control-card" style="margin-bottom: 12px;">
+          <div class="toggle-row">
+            <span class="toggle-label">Wireframe Mesh Overlay</span>
+            <label class="switch">
+              <input type="checkbox" id="toggle-3d-wireframe">
+              <span class="slider-switch"></span>
+            </label>
+          </div>
+
+          <div class="form-group" style="margin-top: 10px;">
+            <label class="form-label">
+              <span>Shoe Stripes Detail</span>
+            </label>
+            <select id="select-shoe-stripes" class="form-select">
+              <option value="embossed" selected>Embossed (+1.2mm Outward)</option>
+              <option value="engraved">Engraved (-1.2mm Recessed Groove)</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- 3D Puzzle Layer Mixer -->
+        <div class="section-title" style="display: flex; justify-content: space-between; align-items: center;">
+          <span>🧩 3D Puzzle Layer Mixer</span>
+          <span style="font-size: 10px; color: var(--text-muted); font-weight: normal;">Click piece in 3D to pick</span>
+        </div>
+        <div id="puzzle-layers-container" class="puzzle-layers-list" style="margin-bottom: 14px;">
+          <!-- Dynamically populated or rendered puzzle piece cards -->
+        </div>
+
+        <!-- Global Dimensions & Scaling -->
+        <div class="section-title">Global Dimensions</div>
+        <div class="control-card" style="margin-bottom: 12px;">
+          <div class="form-group">
+            <div class="form-label">
+              <span>Target Print Height</span>
+              <span class="val" id="val-print-height">100 mm</span>
+            </div>
+            <input type="range" id="slider-print-height" class="range-slider" min="50" max="250" value="100">
+          </div>
+        </div>
+
+        <!-- Live 3D Slicer Metrics Card -->
+        <div class="metrics-card">
+          <div class="section-title" style="margin-bottom: 4px;">Live 3D Slicer Metrics</div>
+          <div class="metrics-grid">
+            <div class="metric-item">
+              <span class="metric-label">Height (Z-Up)</span>
+              <span class="metric-value" id="print-metric-height">100.0 mm</span>
+            </div>
+            <div class="metric-item">
+              <span class="metric-label">Width</span>
+              <span class="metric-value" id="print-metric-width">-- mm</span>
+            </div>
+            <div class="metric-item">
+              <span class="metric-label">Thickness / Depth</span>
+              <span class="metric-value" id="print-metric-depth">-- mm</span>
+            </div>
+            <div class="metric-item">
+              <span class="metric-label">Triangles</span>
+              <span class="metric-value" id="print-metric-tris">--</span>
+            </div>
+          </div>
+          <div class="manifold-status">
+            <span>✓ Watertight Solid • Ready for Slicer (Z-Up)</span>
+          </div>
+        </div>
+
+        <!-- Actions -->
+        <button id="btn-update-3d" class="btn btn-secondary btn-block" style="margin-bottom: 8px;">
+          🔄 Update 3D from Current Pose
+        </button>
+
+        <button id="btn-export-stl" class="btn btn-success btn-block" style="padding: 12px; font-size: 14px; font-weight: 700;">
+          📥 Download .STL for 3D Print
+        </button>
+      </div>
+
+      <!-- TAB 5: JSON EXPORT -->
       <div id="tab-json" class="tab-content">
         <div class="section-title">Save Modified Lottie</div>
         <div class="control-card">
@@ -400,6 +562,8 @@
 
   <!-- Embedded fallback data for offline file:// launch -->
   <script src="embedded-data.js"></script>
+  <!-- 3D Print Studio Engine -->
+  <script src="print-studio.js"></script>
   <!-- Application Logic -->
   <script src="app.js"></script>
 </body>

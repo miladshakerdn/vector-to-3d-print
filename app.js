@@ -1,7 +1,8 @@
 /**
- * Lottie Pose Studio & Vector Exporter
+ * Lottie Pose Studio & 3D Print Exporter
  * Comprehensive interactive studio for extracting poses, tweaking limbs/colors,
- * and exporting static SVG, PNG, WebP, or modified Lottie JSON.
+ * inspecting in 3D clay/colored print preview, and exporting static SVG, PNG, WebP,
+ * or watertight binary STL for 3D printing.
  */
 
 // Application State
@@ -16,6 +17,7 @@ const state = {
   zoom: 1.0,
   bgMode: 'checker',       // 'checker', 'white', 'dark', 'custom'
   customBgColor: '#0b0f19',
+  activeStageView: '2d',   // '2d' or '3d'
   
   // Pose Tweaks
   poseTweaks: {
@@ -42,6 +44,7 @@ const state = {
     '#ffffff': '#ffffff', // White details
   }
 };
+window.state = state;
 
 // Preset Color Palettes
 const PALETTES = {
@@ -75,6 +78,8 @@ const PALETTES = {
 document.addEventListener('DOMContentLoaded', async () => {
   setupTabs();
   setupEventListeners();
+  setupStageViewSwitchers();
+  setupPrintStudioControls();
   setupDragAndDrop();
   
   // Load initial animation data
@@ -290,12 +295,18 @@ function renderAnimation() {
     if (state.isPlaying) {
       state.animInstance.play();
     }
+    if (state.activeStageView === '3d') {
+      debounced3DUpdate();
+    }
   });
 
   state.animInstance.addEventListener('enterFrame', (e) => {
     if (state.isPlaying) {
       state.currentFrame = Math.round(e.currentTime);
       updateTimelineUI();
+      if (state.activeStageView === '3d') {
+        debounced3DUpdate();
+      }
     }
   });
 }
@@ -307,6 +318,11 @@ function goToFrame(frameNumber) {
     state.animInstance.goToAndStop(state.currentFrame, true);
   }
   updateTimelineUI();
+
+  // If in 3D view, update 3D mesh to match pose
+  if (state.activeStageView === '3d') {
+    debounced3DUpdate();
+  }
 }
 
 function updateTimelineUI() {
@@ -399,9 +415,6 @@ function setupEventListeners() {
     } else if (val === 'dark') {
       viewport.classList.add('bg-dark');
       state.bgMode = 'dark';
-    } else if (val === 'custom') {
-      state.bgMode = 'custom';
-      viewport.style.backgroundColor = state.customBgColor;
     }
   });
 
@@ -437,6 +450,270 @@ function updateZoom(delta) {
 function applyZoom() {
   document.getElementById('canvas-wrapper').style.transform = `scale(${state.zoom})`;
   document.getElementById('zoom-display').textContent = `${Math.round(state.zoom * 100)}%`;
+}
+
+// Stage View Switchers (2D vs 3D)
+function setupStageViewSwitchers() {
+  const btn2D = document.getElementById('btn-view-2d');
+  const btn3D = document.getElementById('btn-view-3d');
+
+  btn2D.addEventListener('click', () => switchStageView('2d'));
+  btn3D.addEventListener('click', () => switchStageView('3d'));
+}
+
+function switchStageView(view) {
+  state.activeStageView = view;
+  const viewport2D = document.getElementById('stage-viewport');
+  const viewport3D = document.getElementById('stage-viewport-3d');
+  const btn2D = document.getElementById('btn-view-2d');
+  const btn3D = document.getElementById('btn-view-3d');
+
+  if (view === '3d') {
+    viewport2D.classList.add('inactive-3d');
+    viewport2D.style.display = 'flex'; // Must remain in layout for SVG getCTM()!
+    viewport3D.classList.add('active');
+    btn2D.className = 'btn btn-secondary';
+    btn3D.className = 'btn btn-primary';
+
+    // Initialize PrintStudio if needed
+    PrintStudio.init(document.getElementById('three-viewport'));
+    PrintStudio.updateModel();
+    renderPuzzleLayerMixer();
+  } else {
+    viewport2D.classList.remove('inactive-3d');
+    viewport2D.style.display = 'flex';
+    viewport3D.classList.remove('active');
+    btn2D.className = 'btn btn-primary';
+    btn3D.className = 'btn btn-secondary';
+  }
+}
+
+// Render Puzzle Layer Mixer Cards in Sidebar
+function renderPuzzleLayerMixer() {
+  const container = document.getElementById('puzzle-layers-container');
+  if (!container || !window.PrintStudio) return;
+
+  const layers = PrintStudio.getLayers();
+  container.innerHTML = '';
+
+  const ps = PrintStudio.getState();
+
+  Object.keys(layers).forEach(layerId => {
+    const l = layers[layerId];
+    // Skip coin_plate if not in coin mode
+    if (layerId === 'coin_plate' && ps.modelType !== 'coin') return;
+
+    const card = document.createElement('div');
+    const isSelected = l.id === ps.selectedLayerId;
+    card.className = `puzzle-card ${isSelected ? 'selected open' : ''}`;
+    card.id = `puzzle-card-${l.id}`;
+
+    card.innerHTML = `
+      <div class="puzzle-header">
+        <div class="puzzle-title-wrap">
+          <span class="puzzle-icon">${l.icon}</span>
+          <span>${l.name}</span>
+        </div>
+        <div class="puzzle-actions">
+          <button class="puzzle-toggle-vis ${l.visible ? '' : 'hidden'}" title="Toggle piece visibility">
+            ${l.visible ? '👁️' : '🚫'}
+          </button>
+          <span class="puzzle-chevron">▼</span>
+        </div>
+      </div>
+      <div class="puzzle-body">
+        <div class="puzzle-slider-row">
+          <div class="puzzle-slider-label">
+            <span>Z-Offset (Position)</span>
+            <span class="val">${l.zOffset.toFixed(1)} mm</span>
+          </div>
+          <input type="range" class="range-slider" min="-10" max="25" step="0.5" value="${l.zOffset}" data-param="zOffset">
+        </div>
+        <div class="puzzle-slider-row">
+          <div class="puzzle-slider-label">
+            <span>Thickness / Depth</span>
+            <span class="val">${l.thickness.toFixed(1)} mm</span>
+          </div>
+          <input type="range" class="range-slider" min="0.5" max="30" step="0.5" value="${l.thickness}" data-param="thickness">
+        </div>
+        <div class="puzzle-slider-row">
+          <div class="puzzle-slider-label">
+            <span>Bevel / Edge Roundness</span>
+            <span class="val">${l.bevel.toFixed(1)} mm</span>
+          </div>
+          <input type="range" class="range-slider" min="0" max="4" step="0.1" value="${l.bevel}" data-param="bevel">
+        </div>
+        <div class="puzzle-slider-row">
+          <div class="puzzle-slider-label">
+            <span>Scale / Boost</span>
+            <span class="val">${l.scaleBoost.toFixed(1)}x</span>
+          </div>
+          <input type="range" class="range-slider" min="0.5" max="2.5" step="0.1" value="${l.scaleBoost}" data-param="scaleBoost">
+        </div>
+      </div>
+    `;
+
+    // Click header to toggle open/selected
+    const header = card.querySelector('.puzzle-header');
+    header.addEventListener('click', (e) => {
+      if (e.target.closest('.puzzle-toggle-vis')) return;
+      document.querySelectorAll('.puzzle-card').forEach(c => {
+        if (c !== card) c.classList.remove('selected');
+      });
+      card.classList.toggle('open');
+      card.classList.add('selected');
+      PrintStudio.selectLayer(l.id);
+    });
+
+    // Toggle visibility
+    const visBtn = card.querySelector('.puzzle-toggle-vis');
+    visBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const isVis = PrintStudio.toggleLayerVisibility(l.id);
+      visBtn.textContent = isVis ? '👁️' : '🚫';
+      visBtn.className = `puzzle-toggle-vis ${isVis ? '' : 'hidden'}`;
+    });
+
+    // Slider inputs
+    card.querySelectorAll('input[type="range"]').forEach(slider => {
+      slider.addEventListener('input', (e) => {
+        const param = slider.dataset.param;
+        const val = parseFloat(slider.value);
+        const valLabel = slider.parentElement.querySelector('.val');
+        if (valLabel) {
+          valLabel.textContent = param === 'scaleBoost' ? `${val.toFixed(1)}x` : `${val.toFixed(1)} mm`;
+        }
+        PrintStudio.updateLayerParam(l.id, param, val);
+      });
+    });
+
+    container.appendChild(card);
+  });
+}
+
+// Setup 3D Print Studio Controls in Sidebar
+function setupPrintStudioControls() {
+  // 1. Model Type Segmented Buttons (Coin vs 2.5D vs 360 Figurine)
+  const typeBtns = document.querySelectorAll('#seg-model-type .seg-btn');
+  typeBtns.forEach(btn => {
+    btn.addEventListener('click', () => {
+      typeBtns.forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      const type = btn.dataset.type;
+      
+      const archCoin = document.getElementById('arch-settings-coin');
+      const archFig = document.getElementById('arch-settings-figurine');
+      if (archCoin) archCoin.style.display = (type === 'coin') ? 'block' : 'none';
+      if (archFig) archFig.style.display = (type === '360_figurine') ? 'block' : 'none';
+
+      PrintStudio.setModelType(type);
+      renderPuzzleLayerMixer();
+      showToast(type === 'coin' ? 'Switched to Coin / Medallion Mode' : (type === '25d_flatback' ? 'Switched to 2.5D Flat-Back' : 'Switched to 360° Figurine Mode'));
+    });
+  });
+
+  // Coin Settings
+  const sliderCoinPad = document.getElementById('slider-coin-padding');
+  const valCoinPad = document.getElementById('val-coin-padding');
+  if (sliderCoinPad && valCoinPad) {
+    sliderCoinPad.addEventListener('input', (e) => {
+      const v = parseFloat(e.target.value);
+      valCoinPad.textContent = `${v} mm`;
+      PrintStudio.setCoinPadding(v);
+    });
+  }
+
+  const toggleCoinRim = document.getElementById('toggle-coin-rim');
+  if (toggleCoinRim) {
+    toggleCoinRim.addEventListener('change', (e) => {
+      PrintStudio.setCoinRim(e.target.checked);
+    });
+  }
+
+  const toggleCoinKeychain = document.getElementById('toggle-coin-keychain');
+  if (toggleCoinKeychain) {
+    toggleCoinKeychain.addEventListener('change', (e) => {
+      PrintStudio.setCoinKeychain(e.target.checked);
+    });
+  }
+
+  // 2. Preview Material Segmented Buttons (Monochrome Clay vs Colored)
+  const matBtns = document.querySelectorAll('#seg-material-mode .seg-btn');
+  matBtns.forEach(btn => {
+    btn.addEventListener('click', () => {
+      matBtns.forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      const mat = btn.dataset.mat;
+      PrintStudio.setMaterialMode(mat);
+    });
+  });
+
+  // 3. Toggles
+  const wireframeToggle = document.getElementById('toggle-3d-wireframe');
+  if (wireframeToggle) {
+    wireframeToggle.addEventListener('change', (e) => {
+      PrintStudio.setWireframe(e.target.checked);
+    });
+  }
+
+  const pedestalToggle = document.getElementById('toggle-3d-pedestal');
+  if (pedestalToggle) {
+    pedestalToggle.addEventListener('change', (e) => {
+      PrintStudio.setPedestal(e.target.checked);
+    });
+  }
+
+  const stripesSelect = document.getElementById('select-shoe-stripes');
+  if (stripesSelect) {
+    stripesSelect.addEventListener('change', (e) => {
+      PrintStudio.setStripesMode(e.target.value);
+    });
+  }
+
+  // 4. Dimensional Sliders
+  const sliderHeight = document.getElementById('slider-print-height');
+  const valHeight = document.getElementById('val-print-height');
+  if (sliderHeight && valHeight) {
+    sliderHeight.addEventListener('input', (e) => {
+      const v = parseFloat(e.target.value);
+      valHeight.textContent = `${v} mm`;
+      PrintStudio.setTargetHeight(v);
+    });
+  }
+
+  // 5. Connect 3D Raycast selection to sidebar
+  PrintStudio.onSelectLayer((layerId) => {
+    document.querySelectorAll('.puzzle-card').forEach(c => c.classList.remove('selected'));
+    const targetCard = document.getElementById(`puzzle-card-${layerId}`);
+    if (targetCard) {
+      targetCard.classList.add('selected', 'open');
+      targetCard.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
+  });
+
+  // 6. Overlay Buttons
+  const resetCamBtn = document.getElementById('btn-3d-reset-cam');
+  if (resetCamBtn) resetCamBtn.addEventListener('click', () => PrintStudio.resetCamera());
+
+  const focusBtn = document.getElementById('btn-3d-focus');
+  if (focusBtn) focusBtn.addEventListener('click', () => PrintStudio.focusModel());
+
+  // 7. Action Buttons
+  const update3DBtn = document.getElementById('btn-update-3d');
+  if (update3DBtn) {
+    update3DBtn.addEventListener('click', () => {
+      PrintStudio.updateModel();
+      renderPuzzleLayerMixer();
+      showToast('3D mesh updated from current pose!');
+    });
+  }
+
+  const exportStlBtn = document.getElementById('btn-export-stl');
+  if (exportStlBtn) {
+    exportStlBtn.addEventListener('click', () => {
+      PrintStudio.exportSTL();
+    });
+  }
 }
 
 // Pose Controls
@@ -505,7 +782,18 @@ function debouncedRebuild() {
   rebuildTimeout = setTimeout(() => {
     rebuildWorkingData();
     renderAnimation();
+    if (state.activeStageView === '3d') {
+      debounced3DUpdate();
+    }
   }, 30);
+}
+
+let update3DTimeout = null;
+function debounced3DUpdate() {
+  clearTimeout(update3DTimeout);
+  update3DTimeout = setTimeout(() => {
+    PrintStudio.updateModel();
+  }, 60);
 }
 
 // Color Pickers Setup
@@ -525,6 +813,7 @@ function setupColorPickers() {
     input.addEventListener('input', (e) => {
       state.colorMap[key] = e.target.value;
       debouncedRebuild();
+      PrintStudio.applyMaterials();
     });
   });
 
@@ -543,6 +832,7 @@ function setupColorPickers() {
 
       rebuildWorkingData();
       renderAnimation();
+      PrintStudio.applyMaterials();
       showToast(`Applied ${palette.name} theme`);
     });
   });
@@ -556,11 +846,12 @@ function setupColorPickers() {
     });
     rebuildWorkingData();
     renderAnimation();
+    PrintStudio.applyMaterials();
     showToast('Colors restored to original');
   });
 }
 
-// Export Engine
+// Export Engine (2D)
 function setupExportButtons() {
   // Export SVG
   document.getElementById('btn-export-svg').addEventListener('click', exportSvgFile);
@@ -748,8 +1039,16 @@ function setupTabs() {
       tabContents.forEach(c => c.classList.remove('active'));
 
       btn.classList.add('active');
-      const target = document.getElementById(`tab-${btn.dataset.tab}`);
+      const targetId = `tab-${btn.dataset.tab}`;
+      const target = document.getElementById(targetId);
       if (target) target.classList.add('active');
+
+      // Auto-switch viewport when clicking 3D Print tab
+      if (btn.dataset.tab === '3dprint') {
+        switchStageView('3d');
+      } else {
+        switchStageView('2d');
+      }
     });
   });
 }

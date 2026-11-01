@@ -45,13 +45,78 @@ Watertight binary `.STL` models designed for single-color FDM/SLA/Resin 3D print
 
 ---
 
-## 🚀 How to Run
+## 📥 Installation & Getting Started
 
-1. **Direct Double-Click (100% Offline)**:  
-   Double-click [`index.html`](index.html) in your file explorer. It runs completely offline with bundled libraries (`three.min.js`, `OrbitControls.js`, `SVGLoader.js`, `BufferGeometryUtils.js`, `STLExporter.js`, and `lottie.min.js`).
+### 1. Clone or Download the Repository
 
-2. **Via Local Web Server**:  
-   Double-click [`start.bat`](start.bat) to launch a local server at `http://localhost:8585` (port 8080 is bypassed for system Docker/WSL processes).
+#### Option A: Via Git (Recommended)
+```bash
+git clone https://github.com/miladshakerdn/vector-to-3d-print.git
+cd vector-to-3d-print
+```
+
+#### Option B: Direct ZIP Download
+1. Click the green **Code** button at the top of the GitHub repository.
+2. Select **Download ZIP**.
+3. Extract the ZIP file to any folder on your computer.
+
+---
+
+### 2. How to Launch the Application
+
+You can run the application in three ways depending on your environment:
+
+#### 🟢 Method 1: Zero-Install Instant Launch (100% Offline, No Node or Python Required!)
+- **Action:** Simply double-click [`index.html`](index.html) in your file explorer.
+- **Why it works:** All required libraries (`three.min.js`, `OrbitControls.js`, `SVGLoader.js`, `BufferGeometryUtils.js`, `STLExporter.js`, and `lottie.min.js`) are pre-bundled locally in the folder. Fallback character animation data is embedded in [`embedded-data.js`](embedded-data.js), allowing the studio to function completely offline without an internet connection or web server.
+
+#### 🟢 Method 2: One-Click Windows Launcher (`start.bat`)
+- **Action:** Double-click [`start.bat`](start.bat).
+- It will automatically launch a lightweight local server on port **8585** and open `http://localhost:8585` in your default browser.
+> [!NOTE]  
+> Port **8080** is deliberately bypassed to avoid conflicts with system Docker or WSL processes. Port **8585** is the dedicated local port.
+
+#### 🟢 Method 3: Cross-Platform Terminal / CLI Launchers
+If you prefer running via command line on Windows, macOS, or Linux:
+
+**Using Python 3:**
+```bash
+python -m http.server 8585
+# Then navigate to: http://localhost:8585
+```
+
+**Using Node.js (npx):**
+```bash
+npx serve -l 8585
+# Or using http-server:
+npx http-server -p 8585
+```
+
+**Using PHP:**
+```bash
+php -S localhost:8585
+```
+
+---
+
+### 3. Optional: Developer Verification & Test Suite
+If you want to run the automated headless Chromium verification scripts (`verify-all.js`):
+
+**Prerequisites:**
+- [Node.js](https://nodejs.org/) (version 16 or newer)
+- Microsoft Edge or Google Chrome installed
+
+**Setup & Execution:**
+```bash
+# 1. Install optional dev dependencies (puppeteer-core)
+npm install
+
+# 2. Run the visual verification suite
+node verify-all.js
+```
+The script will launch a headless browser, test all 2D and 3D viewports, inspect mesh watertightness, and capture verification screenshots in [`docs/`](docs/).
+
+---
 
 ---
 

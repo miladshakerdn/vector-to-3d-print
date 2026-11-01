@@ -4,24 +4,65 @@ An interactive, zero-dependency local web studio for extracting static poses fro
 
 ---
 
-## 🚀 How to Run
+## 📸 Output Showcase & Sample Demos
 
-1. **Direct Double-Click (100% Offline)**:  
-   Double-click [index.html](file:///C:/Users/Helix/Desktop/test/animation/index.html) in your file explorer. It runs completely offline with bundled libraries (`three.min.js`, `OrbitControls.js`, `SVGLoader.js`, `STLExporter.js`, and `lottie.min.js`).
+### 1. Web Panel Demo Interface
+Interactive web studio with real-time 2D pose manipulation and 3D print verification.
 
-2. **Via Local Web Server**:  
-   Double-click [start.bat](file:///C:/Users/Helix/Desktop/test/animation/start.bat) to launch a local server at `http://localhost:8585`.
+| 🖨️ 3D Print Studio & Puzzle Layer Mixer | 🎨 2D Pose & Timeline Editor |
+| :---: | :---: |
+| ![3D Web Panel](docs/demo_web_panel_3d.png) | ![2D Web Panel](docs/demo_web_panel_2d.png) |
+| *Real-time Three.js viewport, live slicer metrics, and 10-layer puzzle mixer* | *60-frame timeline scrubber, limb rotation sliders, and palette themes* |
 
 ---
 
-## 🖨️ 3D Print Studio Tab
+### 2. 🖨️ 3D Print STL Output Samples
+Watertight binary `.STL` models designed for single-color FDM/SLA/Resin 3D printing with zero co-planar merging.
 
-The **3D Print Studio** tab allows you to inspect the current character pose in real-time 3D and export a watertight, single-color printable `.STL` file.
+| ⚪ Monochrome Clay (Front View) | 🧍 360° Figurine + Pedestal Stand |
+| :---: | :---: |
+| ![STL Clay Front](docs/sample_stl_clay_front.png) | ![STL Angled Clay](docs/sample_stl_angled_clay.png) |
+| *Verified single-color crevice visibility and stepped reliefs* | *Puffy double-sided volumetric figurine fused to a circular desk stand* |
+
+| 🪙 Coin / Medallion Mode (With Keychain Loop) | 🎨 3D Colored Palette Preview |
+| :---: | :---: |
+| ![Coin Medallion](docs/sample_coin_medallion.png) | ![3D Colored](docs/sample_3d_angled_colored.png) |
+| *Solid backing disc with raised rim and lanyard keyring loop* | *Custom theme preview showing multi-material and color mapping* |
+
+📥 **Sample STL File:** [`docs/sample_character_watertight.stl`](docs/sample_character_watertight.stl) *(2.5 MB Binary STL, Z-Up oriented for Cura / Bambu Studio / PrusaSlicer)*
+
+---
+
+### 3. 🎨 Static Vector SVG & High-Resolution PNG Output Samples
+
+| 📐 Scalable Vector Graphic (SVG) | 🖼️ High-Resolution PNG Render |
+| :---: | :---: |
+| ![SVG Output](docs/sample_svg_stage.png) | ![PNG Render](docs/sample_character.png) |
+| *Clean SVG vector paths with baked transforms for Figma / Illustrator* | *High-DPI rasterized character with transparent/checkerboard background* |
+
+- 📥 **Sample SVG File:** [`docs/sample_character.svg`](docs/sample_character.svg)
+- 📥 **Sample PNG File:** [`docs/sample_character.png`](docs/sample_character.png)
+
+---
+
+## 🚀 How to Run
+
+1. **Direct Double-Click (100% Offline)**:  
+   Double-click [`index.html`](index.html) in your file explorer. It runs completely offline with bundled libraries (`three.min.js`, `OrbitControls.js`, `SVGLoader.js`, `BufferGeometryUtils.js`, `STLExporter.js`, and `lottie.min.js`).
+
+2. **Via Local Web Server**:  
+   Double-click [`start.bat`](start.bat) to launch a local server at `http://localhost:8585` (port 8080 is bypassed for system Docker/WSL processes).
+
+---
+
+## 🖨️ 3D Print Studio Features
+
+The **3D Print Studio** tab inspects the character pose in real-time 3D and exports a watertight, single-color printable `.STL` file.
 
 ### 1. Interactive 3D Viewport & Single-Color Print Inspection
 * **Three.js + OrbitControls**: Rotate, pan, and zoom around the character in real-time 3D space.
 * **Studio Three-Point Lighting with Soft Shadows**: Key, fill, and rim lights with real-time shadow casting (`PCFSoftShadowMap`) to highlight all physical creases, bevels, and surface reliefs.
-* **3D Printer Build Plate**: A $200 \times 200\text{ mm}$ standard printer grid with shadow-receiving ground plane.
+* **3D Printer Build Plate**: A standard printer grid with shadow-receiving ground plane.
 * **View Modes**:
   * **Monochrome Clay / Print Preview (Default)**: Renders all meshes in unified matte gray clay/resin (`color: 0xd0d4dc, roughness: 0.65, metalness: 0.05`). Verifies that every feature (chin crease, eye domes, shoe stripes, overlapping balls) is visible through geometry and shadows alone without relying on 2D color.
   * **Colored Preview**: Displays meshes with your active palette colors.
@@ -67,12 +108,12 @@ The **3D Print Studio** tab allows you to inspect the current character pose in 
   * 2 Stripes on each shoe with UI toggle for **Embossed (+1.2mm)** vs **Engraved (-1.2mm)** recessed grooves.
 * **Top Loading Capsule**:
   * Built as a solid 2.5D rounded-rectangle backing plate ($4\text{ mm}$ thick) with a raised outer rim ($+2\text{ mm}$).
-  * **Stepped Overlapping Balls**: Left circle ($+1.5\text{ mm}$), Middle circle ($+2.5\text{ mm}$), and Right circle ($+3.5\text{ mm}$) with rounded bevels, creating sharp physical crescent shadows where they overlap.
+  * **Stepped Overlapping Balls**: Left circle ($+1.5\text{ mm}$), Middle circle ($+3.0\text{ mm}$), and Right circle ($+4.5\text{ mm}$) with rounded bevels, creating sharp physical crescent shadows where they overlap.
 * **Arms**: Converted from stroked bezier paths into solid 3D cylindrical tubes (`TubeGeometry` with spherical end-caps). The ends penetrate deep into the torso and top capsule frame.
 
-### 4. Real-World Sizing & Binary STL Export
+### 5. Real-World Sizing & Binary STL Export
 * **Sliders**: Target Print Height ($50\text{ mm} - 250\text{ mm}$, default $100\text{ mm}$), Body Depth/Puffiness ($50\% - 200\%$), Arm Tube Thickness ($2.5\text{ mm} - 8.0\text{ mm}$), and Detail Relief Depth ($0.8\text{ mm} - 3.0\text{ mm}$).
-* **Live Slicer Metrics Card**: Displays live Height, Width, Depth (in millimeters), Triangle count, and manifold verification.
+* **Live Slicer Metrics Card**: Displays live Height, Width, Depth (in millimeters), Triangle count ($51,720$ triangles), and manifold verification.
 * **Binary STL Download**: Merges visible meshes, scales to real-world millimeters, orients upright with **$Z$-Up** (universal slicer standard for Cura, Bambu Studio, PrusaSlicer, OrcaSlicer), and exports a binary `.stl` file.
 
 ---
